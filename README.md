@@ -41,7 +41,7 @@ Over the course of the experience, I investigated real-world style security inci
 
 ## Certificate of Completion
 
-See [`certificate.pdf/`](./certificate.pdf/) for the official completion certificate issued by Misk Hub and STC.
+See [View Certificate](./certificate.pdf) for the official completion certificate.
 
 ---
 
