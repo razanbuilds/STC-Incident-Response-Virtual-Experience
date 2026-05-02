@@ -41,7 +41,7 @@ Over the course of the experience, I investigated real-world style security inci
 
 ## Certificate of Completion
 
-See [View Certificate](./certificate.pdf) for the official completion certificate.
+See [View Certificate](./Certificate.pdf) for the official completion certificate.
 
 ---
 
