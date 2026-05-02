@@ -1,58 +1,70 @@
 # Task 3 — Wireshark Network Traffic Analysis
 
-## Objective
+## What This Task Was About
 
-Analyse a suspicious network connection captured in Wireshark to identify malicious activity, determine the nature of the threat, extract Indicators of Compromise (IOCs), and produce a formal cyber incident report.
+I was given a packet capture file (`Example.pcap`) and had to open it in Wireshark, identify the suspicious connection, follow the full TCP stream to understand what the connection was doing, extract all Indicators of Compromise (IOCs), and write a formal incident report.
 
 ---
 
 ## Tool Used
 
-**Wireshark**  
-An industry-standard network protocol analyser used to capture and inspect network packets in real time or from saved capture files.
-
----
-
-## Scenario
-
-A suspicious outbound network connection was detected on the STC network. The connection was flagged for analysis. After inspecting the captured traffic, it was determined the connection originated from a **data-stealing malware (infostealer)** communicating with an attacker-controlled server.
+**Wireshark** — a network protocol analyser used to inspect network packets and understand exactly what data is moving across a network.
 
 ---
 
 ## What I Did
 
-### 1. Traffic Inspection
+### Step 1 — Opening the File and Starting Analysis
 
-Opened the packet capture file in Wireshark and examined the HTTP response content from the suspicious connection. The server response revealed the malware's capabilities and targets.
+I opened `Example.pcap` in Wireshark. The capture had **28 packets total**. I started by applying a `tcp` filter to get an overview of the traffic, then narrowed it down with an `http` filter which brought it down to **4 HTTP packets**.
 
-**Connection details:**
-- Date/Time: Thu, 23 Mar 2023 10:49:07 GMT
-- Server: nginx/1.18.0 (Ubuntu)
-- Suspicious IPs communicating with the infected host
+From there I used `http.request.method == "POST"` to isolate the suspicious outbound request — this immediately highlighted **packet 4**, a POST request being sent from the internal machine `10.41.30.54` to the external IP `37.220.87.68`.
 
-### 2. Malware Behaviour Analysis
+### Step 2 — Following the TCP Stream
 
-The captured traffic showed the infostealer was actively attempting to collect and exfiltrate:
+I right-clicked on the suspicious packet and selected **Follow > TCP Stream** to open the full connection content and see everything being sent and received.
 
-**Cryptocurrency wallet data:**
-- Exodus, Electrum, Ledger Live, Atomic, Binance, Coinomi, Monero, Guarda, Wasabi, and others
+The stream revealed the full conversation between the infected machine and the attacker's server:
 
-**Browser extension credentials:**
-- MetaMask, TronLink, BinanceChain, Coinbase, Trust Wallet, Phantom, Ronin, Brave, and many others
+**What the infected machine sent:**
+```
+POST / HTTP/1.1
+Accept: */*
+Content-Type: application/x-www-form-urlencoded; charset=utf-8
+User-Agent: B1D3N_RIM_MY_ASS
+Host: 37.220.87.68
+Content-Length: 95
+Connection: Keep-Alive
+Cache-Control: no-cache
 
-**Communication platform databases:**
-- Telegram and Discord local databases
+machineId=5c20f0d5-4535-4643-91f7-7962d9485688|LENOVO&configId=23883deb102ef0839fbfe8fcef1a5fc7
+```
 
-**Desktop files matching extensions:**
-- `.txt`, `.dox`, `.pdf`
+**What the attacker's server responded:**
+```
+HTTP/1.1 200 OK
+Server: nginx/1.18.0 (Ubuntu)
+Date: Thu, 23 Mar 2023 10:49:07 GMT
+```
 
-**Malicious downloads attempted:**
-- DLL files: `nss3.dll`, `vcruntime140.dll`, `freebl3.dll`, `sqlite3.dll`, `msvcp140.dll`, `mozglue.dll`, `softokn3.dll`
-- Executable files: `Clip1.exe`, `bebra.exe`
+Two things stood out immediately:
 
-### 3. IOC Extraction
+- The **User-Agent `B1D3N_RIM_MY_ASS`** — no legitimate software uses a user agent like this. This is custom malware.
+- The **POST body sending a machine ID and config ID** — the malware was registering the infected device with the attacker's server.
 
-Compiled all Indicators of Compromise from the captured traffic:
+The server's `200 OK` response confirmed the C2 communication was successful.
+
+### Step 3 — Additional Finding
+
+Back in the packet list, packet 17 showed the infected machine making a **GET request for `nss3.dll`** from the attacker's server. This DLL is used by infostealer malware to extract saved passwords from browsers — confirming this was a credential-stealing attack.
+
+### Step 4 — Writing the Incident Report and IOC Table
+
+Based on everything found in the TCP stream and the packet list, I compiled the full IOC table and wrote the incident report.
+
+---
+
+## IOC Table
 
 | # | Type | Value |
 |---|------|-------|
@@ -77,22 +89,21 @@ Compiled all Indicators of Compromise from the captured traffic:
 |-------|-------|
 | Title | Suspicious network connection attempting to steal information |
 | Category | Network hacking |
-| Date of Incident | Thu, 23 Mar 2023 10:49:07 GMT |
+| Date of incident | Thu, 23 Mar 2023 10:49:07 GMT |
+| Discovery date | April 2026 |
 | Type | Incident |
 | Source | Internal |
-| Summary | A suspicious connection was detected originating from an infostealer malware. The malware communicated with an attacker's C2 server and attempted to exfiltrate cryptocurrency wallets, browser extension credentials, messaging app databases, and sensitive desktop files. |
 
-### Recommendations
-- Block all identified IOCs (IPs, EXE and DLL files) immediately
-- Scan the network for any other hosts communicating with the same IOCs
-- Report the incident to the relevant authorities, including the Saudi Cybersecurity Authority (NCA)
+**Summary:** A suspicious connection was detected originating from an infostealer malware on an internal machine. After following the TCP stream, it was confirmed the malware was communicating with an attacker-controlled C2 server at `37.220.87.68`, sending device identifiers and attempting to download malicious DLL files to extract browser credentials, cryptocurrency wallet data, Telegram and Discord databases, and desktop files ending in `.txt`, `.dox`, and `.pdf`.
+
+**Recommendations:**
+- Block all identified IOC IPs at the firewall immediately
+- Block the malicious EXE and DLL files by hash
+- Scan the rest of the network for any other hosts communicating with the same IOCs
+- Report the incident to the relevant authorities (Saudi Cybersecurity Authority — NCA)
 
 ---
 
 ## What I Learned
 
-- How to analyse captured network traffic in Wireshark
-- How to identify C2 (Command & Control) communication patterns
-- How infostealer malware operates and what data it targets
-- How to extract and compile an IOC table from network evidence
-- How to write recommendations based on incident findings
+The task instructions were straightforward — open the file, find the suspicious connection, follow the TCP stream. But what made it click for me was seeing the User-Agent string `B1D3N_RIM_MY_ASS` in the raw packet data. That one field tells you immediately you're not dealing with normal traffic. Learning to read TCP streams and understand what malware is actually sending is a skill I didn't have before this task.
